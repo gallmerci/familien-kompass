@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f5ef">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Familien-Kompass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-screen phone app, orienteering-map palette (control-flag orange on map paper / pine at night) */
+:root{
+  --paper:#f3f5ef; --ink:#17221b; --muted:#5d6b61; --line:#cfd6cb;
+  --card:#ffffff; --flag:#ec5f12; --flag-ink:#ffffff; --forest:#2f6b45; --warn:#b4361b;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#101813; --ink:#e7eee6; --muted:#93a396; --line:#2b3a30;
+  --card:#18231c; --flag:#ff7a2e; --flag-ink:#1a0d04; --forest:#6cc08c; --warn:#ff8a6b;
+  color-scheme:dark;
+}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{
+  background:var(--paper);color:var(--ink);font:16px/1.45 var(--body);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-tap-highlight-color:transparent;
+}
+.app{max-width:460px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;gap:18px;padding-block:18px 24px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:850;font-stretch:80%;font-size:1.35rem;letter-spacing:.01em;text-transform:uppercase}
+.brand svg{flex:none}
+.back{background:none;border:1px solid var(--line);color:var(--ink);font:600 .9rem var(--body);padding:8px 12px;border-radius:999px;cursor:pointer}
+h1{font-family:var(--display);font-stretch:75%;font-weight:850;font-size:2.4rem;line-height:1;margin:6px 0 0;text-transform:uppercase;text-wrap:balance}
+.lead{color:var(--muted);margin:0;max-width:40ch}
+.choices{display:grid;gap:12px}
+.choice{display:grid;grid-template-columns:56px 1fr;gap:14px;align-items:center;text-align:left;width:100%;
+  background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;color:var(--ink);cursor:pointer;font:inherit}
+.choice:hover{border-color:var(--flag)}
+.choice b{display:block;font-family:var(--display);font-stretch:85%;font-size:1.2rem;font-weight:800}
+.choice span{color:var(--muted);font-size:.92rem}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:56px;border-radius:16px;border:0;cursor:pointer;
+  font:800 1.05rem var(--body);font-stretch:90%;letter-spacing:.02em;text-transform:uppercase;text-decoration:none;padding:12px 16px}
+.btn.primary{background:var(--flag);color:var(--flag-ink)}
+.btn.secondary{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.choice:focus-visible,.back:focus-visible,input:focus-visible{outline:3px solid var(--flag);outline-offset:2px}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.stat{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.stat:last-child{border-bottom:0}
+.stat .k{color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.08em}
+.stat .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.95rem;text-align:right;overflow-wrap:anywhere}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:4px 16px}
+.meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--flag);transition:width .4s}
+.note{font-size:.9rem;color:var(--muted);margin:0}
+.note.warn{color:var(--warn)}
+.big{font-family:var(--display);font-stretch:70%;font-weight:900;font-size:4.6rem;line-height:.9;text-align:center;font-variant-numeric:tabular-nums}
+.big small{font-size:1.6rem;font-weight:800;margin-left:4px}
+.sub{text-align:center;color:var(--muted);margin:6px 0 0;min-height:1.4em}
+.trend{display:inline-block;padding:3px 10px;border-radius:99px;font-weight:800;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em}
+.trend.warm{background:var(--flag);color:var(--flag-ink)}
+.trend.cold{background:var(--line);color:var(--ink)}
+.dialwrap{position:relative;width:min(78vw,320px);aspect-ratio:1;max-width:100%;margin:0 auto}
+.dialwrap svg{position:absolute;inset:0;width:100%;height:100%}
+#rose,#needle{transition:transform .25s linear;transform-origin:50% 50%}
+.arrived #needle{opacity:.25}
+.arrivedmsg{display:none;position:absolute;inset:28%;border-radius:50%;background:var(--flag);color:var(--flag-ink);
+  align-items:center;justify-content:center;text-align:center;font:900 1.15rem var(--display);font-stretch:80%;text-transform:uppercase;padding:8px}
+.arrived .arrivedmsg{display:flex}
+label{font-weight:700;font-size:.9rem}
+input[type=text]{width:100%;min-height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:500 .95rem var(--mono);padding:10px 12px}
+.confirm{display:grid;gap:10px;background:var(--card);border:1.5px solid var(--flag);border-radius:16px;padding:14px}
+.confirm p{margin:0;font-weight:600}
+.code{font-family:var(--mono);font-size:1.05rem;text-align:center;padding:12px;border:1.5px dashed var(--line);border-radius:14px;user-select:all;overflow-wrap:anywhere}
+.spacer{flex:1}
+@media (prefers-reduced-motion:reduce){#rose,#needle,.meter i{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="2" y="2" width="26" height="26" rx="3" fill="#fff" stroke="var(--ink)" stroke-width="1.5"/><path d="M3 27L27 3V27Z" fill="#ec5f12"/></svg>
+      Familien-Kompass
+    </div>
+    <button class="back" id="backBtn" hidden>Zurück</button>
+  </header>
+
+  <!-- Start -->
+  <section id="vStart" class="choices">
+    <div>
+      <h1>Wer versteckt, wer sucht?</h1>
+      <p class="lead">Ein Team speichert seinen Standort und schickt den Link. Das andere Team folgt dem Pfeil.</p>
+    </div>
+    <button class="choice" id="goHide">
+      <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="27" fill="var(--flag)"/><path d="M28 13c-6 0-10.5 4.6-10.5 10.4C17.5 31 28 43 28 43s10.5-12 10.5-19.6C38.5 17.6 34 13 28 13z" fill="var(--flag-ink)"/><circle cx="28" cy="23.5" r="4" fill="var(--flag)"/></svg>
+      <div><b>Wir verstecken uns</b><span>Standort per GPS einloggen und als Link teilen</span></div>
+    </button>
+    <button class="choice" id="goSeek">
+      <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="27" fill="var(--forest)"/><circle cx="28" cy="28" r="17" fill="none" stroke="var(--paper)" stroke-width="2.5"/><path d="M28 13l5 15h-10z" fill="var(--paper)"/><path d="M28 43l-5-15h10z" fill="var(--paper)" opacity=".45"/></svg>
+      <div><b>Wir suchen</b><span>Link öffnen oder Koordinaten einfügen, dann dem Kompass folgen</span></div>
+    </button>
+    <div class="spacer"></div>
+    <p class="note" id="secureNote" hidden></p>
+  </section>
+
+  <!-- Hide -->
+  <section id="vHide" hidden style="display:grid;gap:16px">
+    <div>
+      <h1>Ziel einloggen</h1>
+      <p class="lead">Stellt euch an euren Platz und wartet, bis das GPS genau genug ist. Unter freiem Himmel geht es am schnellsten.</p>
+    </div>
+    <div class="panel">
+      <div class="stat"><span class="k">GPS-Genauigkeit</span><span class="v" id="hAcc">wird gesucht …</span></div>
+      <div class="stat"><span class="k">Messungen</span><span class="v" id="hCount">0</span></div>
+      <div style="padding:6px 0 14px"><div class="meter"><i id="hMeter"></i></div></div>
+    </div>
+    <p class="note" id="hMsg"></p>
+    <button class="btn primary" id="lockBtn" disabled>Position einloggen</button>
+
+    <div id="hLocked" hidden style="display:grid;gap:12px">
+      <div class="code" id="hCode"></div>
+      <button class="btn primary" id="shareBtn">Link an Suchteam schicken</button>
+      <div class="row">
+        <button class="btn secondary" id="copyBtn">Link kopieren</button>
+        <button class="btn secondary" id="relockBtn">Neu einloggen</button>
+      </div>
+      <p class="note" id="shareMsg"></p>
+    </div>
+  </section>
+
+  <!-- Seek: enter target -->
+  <section id="vEnter" hidden style="display:grid;gap:14px">
+    <div>
+      <h1>Ziel eingeben</h1>
+      <p class="lead">Am einfachsten öffnet ihr den geschickten Link direkt. Sonst hier den Link oder die Koordinaten einfügen.</p>
+    </div>
+    <label for="targetInput">Link oder Koordinaten</label>
+    <input type="text" id="targetInput" inputmode="text" autocomplete="off" placeholder="51.481845, 7.216236">
+    <p class="note warn" id="enterMsg"></p>
+    <button class="btn primary" id="startSeek">Suche starten</button>
+  </section>
+
+  <!-- Seek: compass -->
+  <section id="vSeek" hidden style="display:grid;gap:14px">
+    <div>
+      <div class="big" id="dist">–</div>
+      <p class="sub" id="distSub">Warte auf GPS …</p>
+    </div>
+    <div class="dialwrap" id="dialwrap">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <g id="rose">
+          <circle cx="100" cy="100" r="96" fill="var(--card)" stroke="var(--line)" stroke-width="2"/>
+          <g id="ticks"></g>
+          <text x="100" y="30" text-anchor="middle" font-family="Archivo,sans-serif" font-weight="900" font-size="17" fill="var(--warn)">N</text>
+          <text x="172" y="106" text-anchor="middle" font-family="Archivo,sans-serif" font-weight="800" font-size="14" fill="var(--muted)">O</text>
+          <text x="100" y="182" text-anchor="middle" font-family="Archivo,sans-serif" font-weight="800" font-size="14" fill="var(--muted)">S</text>
+          <text x="28" y="106" text-anchor="middle" font-family="Archivo,sans-serif" font-weight="800" font-size="14" fill="var(--muted)">W</text>
+        </g>
+        <g id="needle">
+          <path d="M100 38 L121 112 L100 101 L79 112 Z" fill="var(--flag)" stroke="var(--ink)" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="100" cy="100" r="6" fill="var(--ink)"/>
+        </g>
+        <path d="M100 4 L106 14 L94 14 Z" fill="var(--ink)"/>
+      </svg>
+      <div class="arrivedmsg">Ihr seid da! Schaut euch um</div>
+    </div>
+    <p class="note" id="compassMsg" style="text-align:center"></p>
+    <button class="btn secondary" id="compassBtn">Kompass aktivieren</button>
+    <div class="panel">
+      <div class="stat"><span class="k">Richtung</span><span class="v" id="sBearing">–</span></div>
+      <div class="stat"><span class="k">GPS-Genauigkeit</span><span class="v" id="sAcc">–</span></div>
+    </div>
+    <button class="btn primary" id="revealBtn">Auf Karte zeigen</button>
+    <div class="confirm" id="revealConfirm" hidden>
+      <p>Wirklich auflösen? Dann seht ihr das Ziel auf der Karte.</p>
+      <div class="row">
+        <a class="btn primary" id="mapsLink" target="_blank" rel="noopener">Ja, Karte öffnen</a>
+        <button class="btn secondary" id="revealCancel">Weiter suchen</button>
+      </div>
+    </div>
+    <button class="btn secondary" id="newTarget">Anderes Ziel</button>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k){ try { return JSON.parse(localStorage.getItem('fk_'+k)); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem('fk_'+k, JSON.stringify(v)); } catch(e){} }
+  };
+  const views = ['vStart','vHide','vEnter','vSeek'];
+  let geoWatch = null, wakeLock = null;
+
+  // ---------- geo math ----------
+  const R = 6371000, rad = d => d*Math.PI/180, deg = r => r*180/Math.PI;
+  function distance(a,b){
+    const dLat = rad(b.lat-a.lat), dLng = rad(b.lng-a.lng);
+    const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
+    return 2*R*Math.asin(Math.sqrt(h));
+  }
+  function bearing(a,b){
+    const y = Math.sin(rad(b.lng-a.lng))*Math.cos(rad(b.lat));
+    const x = Math.cos(rad(a.lat))*Math.sin(rad(b.lat)) - Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lng-a.lng));
+    return (deg(Math.atan2(y,x))+360)%360;
+  }
+  const DIRS = ['N','NO','O','SO','S','SW','W','NW'];
+  const dirName = b => DIRS[Math.round(b/45)%8];
+  const nf = (n,d) => n.toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
+  function fmtDist(m){
+    if (m < 1000) return {n: Math.round(m).toString(), u: 'm'};
+    return {n: nf(m/1000, m < 10000 ? 2 : 1), u: 'km'};
+  }
+
+  // ---------- target parsing / links ----------
+  function parseTarget(text){
+    if (!text) return null;
+    text = decodeURIComponent(String(text)).trim();
+    const pats = [/[#?&]z=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/, /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+                  /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/, /(-?\d{1,2}\.\d+)\s*[,; ]\s*(-?\d{1,3}\.\d+)/];
+    for (const p of pats){
+      const m = text.match(p);
+      if (m){
+        const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+        if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return {lat, lng};
+      }
+    }
+    return null;
+  }
+  const coordText = t => `${t.lat.toFixed(6)}, ${t.lng.toFixed(6)}`;
+  const shareUrl = t => location.origin + location.pathname + `#z=${t.lat.toFixed(6)},${t.lng.toFixed(6)}`;
+  const mapsUrl = t => `https://www.google.com/maps/search/?api=1&query=${t.lat.toFixed(6)},${t.lng.toFixed(6)}`;
+  const canShareLinks = /^https?:$/.test(location.protocol);
+
+  // ---------- view switching ----------
+  function show(v){
+    views.forEach(id => $(id).hidden = id !== v);
+    $('backBtn').hidden = v === 'vStart';
+    if (v !== 'vHide' && v !== 'vSeek') stopGeo();
+    if (v !== 'vSeek') releaseWake();
+    store.set('view', v);
+    window.scrollTo(0,0);
+  }
+  $('backBtn').onclick = () => { show('vStart'); history.replaceState(null,'',location.pathname); };
+
+  function startGeo(onPos, onErr){
+    stopGeo();
+    if (!('geolocation' in navigator)) { onErr({code:0}); return; }
+    geoWatch = navigator.geolocation.watchPosition(onPos, onErr, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+  }
+  function stopGeo(){ if (geoWatch !== null) { navigator.geolocation.clearWatch(geoWatch); geoWatch = null; } }
+  function geoError(e){
+    if (e.code === 1) return 'Standortzugriff wurde abgelehnt. Erlaubt ihn in den Browser- bzw. Handy-Einstellungen für diese Seite und ladet neu.';
+    if (e.code === 3) return 'GPS antwortet noch nicht. Geht ein Stück ins Freie, es wird weiter versucht.';
+    if (!window.isSecureContext) return 'Standort geht nur über https. Öffnet die App über ihre https-Adresse.';
+    return 'Kein Standort verfügbar. Ist die Ortung am Handy eingeschaltet?';
+  }
+
+  async function holdWake(){
+    try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch(e){}
+  }
+  function releaseWake(){ try { wakeLock && wakeLock.release(); } catch(e){} wakeLock = null; }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('vSeek').hidden) holdWake(); });
+
+  // ---------- HIDE TEAM ----------
+  // Keeps recent fixes and averages the most accurate ones, because a single GPS fix can jump by 10–30 m.
+  let samples = [];
+  function enterHide(){
+    show('vHide');
+    samples = [];
+    $('hLocked').hidden = true; $('lockBtn').hidden = false; $('lockBtn').disabled = true;
+    $('hAcc').textContent = 'wird gesucht …'; $('hCount').textContent = '0'; $('hMeter').style.width = '0';
+    $('hMsg').textContent = ''; $('hMsg').className = 'note';
+    startGeo(pos => {
+      const c = pos.coords;
+      samples.push({lat:c.latitude, lng:c.longitude, acc:c.accuracy, t:Date.now()});
+      if (samples.length > 20) samples.shift();
+      $('hAcc').textContent = '± ' + Math.round(c.accuracy) + ' m';
+      $('hCount').textContent = samples.length;
+      // meter: full at 5 m, empty at 60 m
+      const q = Math.max(0, Math.min(1, (60 - c.accuracy) / 55));
+      $('hMeter').style.width = (q*100) + '%';
+      $('lockBtn').disabled = false;
+      $('hMsg').className = 'note';
+      $('hMsg').textContent = c.accuracy <= 15 ? 'Gut genug. Ihr könnt einloggen.'
+        : c.accuracy <= 40 ? 'Geht schon, aber ein paar Sekunden warten macht es genauer.'
+        : 'Noch ungenau. Wartet kurz oder geht weg von Häusern und Bäumen.';
+    }, e => { $('hMsg').className = 'note warn'; $('hMsg').textContent = geoError(e); });
+  }
+  function bestFix(){
+    const best = Math.min(...samples.map(s => s.acc));
+    const good = samples.slice(-10).filter(s => s.acc <= Math.max(best*1.5, best+5));
+    let w = 0, lat = 0, lng = 0;
+    for (const s of good) { const k = 1/(s.acc*s.acc); w += k; lat += s.lat*k; lng += s.lng*k; }
+    return {lat: lat/w, lng: lng/w, acc: best};
+  }
+  $('lockBtn').onclick = () => {
+    if (!samples.length) return;
+    const t = bestFix();
+    stopGeo();
+    store.set('hidden', t);
+    renderLocked(t);
+  };
+  function renderLocked(t){
+    $('lockBtn').hidden = true; $('hLocked').hidden = false;
+    $('hCode').textContent = coordText(t);
+    $('hMsg').className = 'note';
+    $('hMsg').textContent = `Eingeloggt mit ± ${Math.round(t.acc)} m. Bleibt jetzt hier.`;
+    $('shareMsg').textContent = canShareLinks ? '' : 'Diese Datei ist lokal geöffnet, ein Link funktioniert bei den anderen nicht. Schickt stattdessen die Koordinaten oben.';
+  }
+  $('relockBtn').onclick = enterHide;
+  async function copy(text, msgEl, okMsg){
+    try { await navigator.clipboard.writeText(text); msgEl.textContent = okMsg; }
+    catch(e){
+      const r = document.createRange(); r.selectNodeContents($('hCode'));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      msgEl.textContent = 'Kopieren ging nicht automatisch. Die Koordinaten sind markiert, kopiert sie von Hand.';
+    }
+  }
+  $('shareBtn').onclick = async () => {
+    const t = store.get('hidden'); if (!t) return;
+    const text = canShareLinks ? 'Findet uns! Öffnet den Link und folgt dem Pfeil:' : 'Findet uns! Koordinaten: ' + coordText(t);
+    const payload = canShareLinks ? {title:'Familien-Kompass', text, url: shareUrl(t)} : {title:'Familien-Kompass', text};
+    if (navigator.share) {
+      try { await navigator.share(payload); $('shareMsg').textContent = ''; return; }
+      catch(e){ if (e.name === 'AbortError') return; }
+    }
+    copy(canShareLinks ? shareUrl(t) : coordText(t), $('shareMsg'), 'Link kopiert. Schickt ihn per Messenger an das Suchteam.');
+  };
+  $('copyBtn').onclick = () => {
+    const t = store.get('hidden'); if (!t) return;
+    copy(canShareLinks ? shareUrl(t) : coordText(t), $('shareMsg'), canShareLinks ? 'Link kopiert.' : 'Koordinaten kopiert.');
+  };
+
+  // ---------- SEEK TEAM ----------
+  let target = null, me = null, heading = null, gpsCourse = null, compassSeen = false;
+  let roseAngle = 0, needleAngle = 0, trail = [];
+
+  // tick marks on the dial
+  (() => {
+    const g = $('ticks'); let s = '';
+    for (let i = 0; i < 72; i++) {
+      const a = i*5, long = a % 30 === 0, r1 = long ? 80 : 86;
+      const x1 = 100 + r1*Math.sin(rad(a)), y1 = 100 - r1*Math.cos(rad(a));
+      const x2 = 100 + 92*Math.sin(rad(a)), y2 = 100 - 92*Math.cos(rad(a));
+      s += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="var(--muted)" stroke-width="${long?2:1}"/>`;
+    }
+    g.innerHTML = s;
+  })();
+
+  function enterSeek(t){
+    target = t; store.set('target', t);
+    me = null; trail = []; gpsCourse = null;
+    show('vSeek');
+    $('revealConfirm').hidden = true; $('revealBtn').hidden = false;
+    $('mapsLink').href = mapsUrl(t);
+    $('dist').textContent = '–'; $('distSub').textContent = 'Warte auf GPS …';
+    $('compassBtn').hidden = compassSeen;
+    if (!compassSeen) $('compassMsg').textContent = 'Tippt auf „Kompass aktivieren“, damit sich der Pfeil mit dem Handy dreht.';
+    holdWake();
+    startGeo(pos => {
+      const c = pos.coords;
+      me = {lat:c.latitude, lng:c.longitude, acc:c.accuracy};
+      if (c.heading != null && !isNaN(c.heading) && c.speed > 0.6) gpsCourse = c.heading;
+      $('sAcc').textContent = '± ' + Math.round(c.accuracy) + ' m';
+      trail.push({d: distance(me, target), t: Date.now()});
+      trail = trail.filter(h => Date.now() - h.t < 20000);
+      render();
+    }, e => { $('distSub').textContent = geoError(e); });
+    // try listening right away (works on Android without a tap)
+    listenOrientation();
+  }
+
+  function render(){
+    if (!me || !target) return;
+    const d = distance(me, target), b = bearing(me, target), f = fmtDist(d);
+    $('dist').innerHTML = `${f.n}<small>${f.u}</small>`;
+    $('sBearing').textContent = `${Math.round(b)}° ${dirName(b)}`;
+    const arrived = d <= Math.max(10, me.acc);
+    $('dialwrap').classList.toggle('arrived', arrived);
+    if (arrived) { $('distSub').textContent = 'Im Umkreis der GPS-Genauigkeit.'; }
+    else {
+      // warmer/colder: compare against the reading ~10–20 s ago, ignoring GPS jitter below 4 m
+      const old = trail.find(h => Date.now() - h.t > 8000) || trail[0];
+      const delta = old ? d - old.d : 0;
+      $('distSub').innerHTML = Math.abs(delta) < 4 ? 'Geht los in Pfeilrichtung'
+        : delta < 0 ? '<span class="trend warm">Wärmer</span>' : '<span class="trend cold">Kälter</span>';
+    }
+    const h = heading != null ? heading : gpsCourse;
+    if (h == null) {
+      rotate('rose', 0); rotate('needle', b);
+      if (compassSeen === false && $('compassBtn').hidden) $('compassMsg').textContent = 'Kein Kompass erkannt. Der Pfeil zeigt nach Norden ausgerichtet; beim Gehen dreht er sich per GPS mit.';
+    } else {
+      rotate('rose', -h); rotate('needle', b - h);
+    }
+  }
+  // rotate along the shortest path so the needle never spins a full turn at 359°→0°
+  function rotate(id, target){
+    let cur = id === 'rose' ? roseAngle : needleAngle;
+    let diff = ((target - cur) % 360 + 540) % 360 - 180;
+    cur += diff;
+    if (id === 'rose') roseAngle = cur; else needleAngle = cur;
+    $(id).style.transform = `rotate(${cur}deg)`;
+  }
+
+  // ---------- compass ----------
+  let listening = false, sx = 0, sy = 0;
+  function onOrient(e){
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading;
+    else if ((e.absolute || e.type === 'deviceorientationabsolute') && e.alpha != null) h = (360 - e.alpha) % 360;
+    if (h == null) return;
+    const so = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    h = (h + so + 360) % 360;
+    // low-pass on the unit circle to calm the jitter of phone magnetometers
+    sx = sx*0.8 + Math.sin(rad(h))*0.2; sy = sy*0.8 + Math.cos(rad(h))*0.2;
+    heading = (deg(Math.atan2(sx, sy)) + 360) % 360;
+    if (!compassSeen) { compassSeen = true; $('compassBtn').hidden = true; $('compassMsg').textContent = 'Handy flach halten. Wenn der Pfeil spinnt: einmal eine Acht in die Luft malen.'; }
+    render();
+  }
+  function listenOrientation(){
+    if (listening) return;
+    listening = true;
+    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient);
+    else window.addEventListener('deviceorientation', onOrient);
+  }
+  $('compassBtn').onclick = async () => {
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const r = await DeviceOrientationEvent.requestPermission();
+        if (r !== 'granted') { $('compassMsg').textContent = 'Kompass nicht erlaubt. Der Pfeil richtet sich dann nur beim Gehen per GPS aus.'; return; }
+      }
+    } catch(e){}
+    listening = false;
+    window.removeEventListener('deviceorientationabsolute', onOrient);
+    window.removeEventListener('deviceorientation', onOrient);
+    listenOrientation();
+    setTimeout(() => {
+      if (!compassSeen) { $('compassBtn').hidden = true; $('compassMsg').textContent = 'Dieses Gerät hat keinen Kompass. Der Pfeil dreht sich beim Gehen per GPS mit.'; render(); }
+    }, 2500);
+  };
+
+  $('revealBtn').onclick = () => { $('revealBtn').hidden = true; $('revealConfirm').hidden = false; };
+  $('revealCancel').onclick = () => { $('revealBtn').hidden = false; $('revealConfirm').hidden = true; };
+  $('newTarget').onclick = () => { window.history.replaceState(null,'',location.pathname); $('targetInput').value=''; show('vEnter'); };
+
+  $('startSeek').onclick = () => {
+    const t = parseTarget($('targetInput').value);
+    if (!t) { $('enterMsg').textContent = 'Das sieht nicht nach Koordinaten aus. Beispiel: 51.481845, 7.216236'; return; }
+    $('enterMsg').textContent = '';
+    enterSeek(t);
+  };
+  $('targetInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('startSeek').click(); });
+
+  $('goHide').onclick = () => {
+    const t = store.get('hidden');
+    if (t && store.get('view') === 'vHide') { show('vHide'); renderLocked(t); } else enterHide();
+  };
+  $('goSeek').onclick = () => {
+    const t = store.get('target');
+    if (t) $('targetInput').value = coordText(t);
+    show('vEnter');
+  };
+
+  // ---------- boot ----------
+  if (!window.isSecureContext) {
+    $('secureNote').hidden = false;
+    $('secureNote').textContent = 'Hinweis: Standort und Kompass funktionieren nur, wenn die Seite über https geöffnet ist.';
+  }
+  const fromLink = parseTarget(location.hash) || parseTarget(location.search);
+  if (fromLink) enterSeek(fromLink);
+  else show('vStart');
+  window.addEventListener('hashchange', () => { const t = parseTarget(location.hash); if (t) enterSeek(t); });
+})();
+</script>
+</body>
+</html>
